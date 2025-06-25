@@ -1,0 +1,48 @@
+# ansible-eks-deploy-code/test_playbook.yaml
+
+---
+- name: Test EKS NGINX Deployment Playbook
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Check kubeconfig file exists
+      stat:
+        path: ~/.kube/config
+      register: kubeconfig_stat
+
+    - name: Assert kubeconfig file was created
+      assert:
+        that:
+          - kubeconfig_stat.stat.exists
+
+    - name: Get NGINX deployment info
+      kubernetes.core.k8s_info:
+        kubeconfig: ~/.kube/config
+        kind: Deployment
+        namespace: default
+        name: nginx-deployment
+      register: nginx_deployment
+
+    - name: Assert NGINX deployment exists and has 2 replicas
+      assert:
+        that:
+          - nginx_deployment.resources | length > 0
+          - nginx_deployment.resources[0].spec.replicas == 2
+          - nginx_deployment.resources[0].spec.template.spec.containers[0].ports[0].containerPort == 80
+
+    - name: Get NGINX service info
+      kubernetes.core.k8s_info:
+        kubeconfig: ~/.kube/config
+        kind: Service
+        namespace: default
+        name: nginx-service
+      register: nginx_service
+
+    - name: Assert NGINX service exists and is LoadBalancer on port 80
+      assert:
+        that:
+          - nginx_service.resources | length > 0
+          - nginx_service.resources[0].spec.type == "LoadBalancer"
+          - nginx_service.resources[0].spec.ports[0].port == 80
+          - nginx_service.resources[0].spec.ports[0].targetPort == 80
